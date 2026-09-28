@@ -123,9 +123,34 @@ def get_analysis(symbol: str):
         symbol = symbol + ".NS"
     return analyze_stock(symbol)
 
+@app.get("/api/news")
+def get_news():
+    news_items = []
+    seen_ids = set()
+    # Fetch news from a few major stocks to get general market news
+    for stock in ["RELIANCE.NS", "HDFCBANK.NS", "TCS.NS"]:
+        try:
+            ticker = yf.Ticker(stock)
+            news = ticker.news
+            for item in news:
+                item_id = item.get("id") or item.get("uuid")
+                if item_id and item_id not in seen_ids:
+                    seen_ids.add(item_id)
+                    news_items.append(item)
+        except Exception as e:
+            print(f"Error fetching news for {stock}: {e}")
+
+    # Sort by publish date descending
+    news_items.sort(key=lambda x: x.get('content', {}).get('pubDate', ''), reverse=True)
+    return news_items[:10]
+
 @app.get("/api/popular")
 def get_popular():
-    popular_stocks = ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK"]
+    popular_stocks = [
+        "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK",
+        "ITC", "SBIN", "BHARTIARTL", "BAJFINANCE", "LT",
+        "HUL", "ASIANPAINT", "MARUTI"
+    ]
     results = []
     for stock in popular_stocks:
         try:
