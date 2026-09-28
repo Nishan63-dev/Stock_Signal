@@ -43,6 +43,9 @@ command. The deployed API will be available at:
 https://<your-render-service>.onrender.com/api/popular
 ```
 
+The root `requirements.txt` also includes `backend/requirements.txt`, so the
+existing Render build command `pip install -r requirements.txt` remains compatible.
+
 ## Technical Stack
 - **Backend**: Python, FastAPI, yfinance, pandas_ta
 - **Frontend**: HTML, JavaScript, Tailwind CSS
