@@ -87,6 +87,10 @@ def analyze_stock(ticker_symbol: str):
         stop_loss = current_price + (1.5 * atr)
         target = current_price - (3 * atr)
         
+    # Get last 30 data points for the mini-chart
+    history_dates = [str(d) for d in df.index[-30:]]
+    history_prices = [round(p, 2) for p in df['Close'][-30:]]
+
     return {
         "ticker": ticker_symbol,
         "current_price": round(current_price, 2),
@@ -100,6 +104,10 @@ def analyze_stock(ticker_symbol: str):
             "ema20": round(ema20, 2) if not pd.isna(ema20) else None,
             "ema50": round(ema50, 2) if not pd.isna(ema50) else None,
             "atr": round(atr, 2) if not pd.isna(atr) else None
+        },
+        "history": {
+            "dates": history_dates,
+            "prices": history_prices
         },
         "last_updated": str(latest.name)
     }
