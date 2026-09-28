@@ -59,20 +59,24 @@ def analyze_stock(ticker_symbol: str):
     bb_bounce = low_price <= bbl_20
 
     # Simple strategy logic
-    if ema20 > ema50 and rsi < 70 and macd > macd_signal and (vol_breakout or bb_bounce):
+    if (ema20 > ema50 or macd > macd_signal) and rsi < 70 and (vol_breakout or bb_bounce or rsi < 40):
         signal = "BUY"
-        reason.append("Uptrend (EMA20 > EMA50)")
-        reason.append("MACD Bullish Crossover")
+        if ema20 > ema50:
+            reason.append("Uptrend (EMA20 > EMA50)")
+        if macd > macd_signal:
+            reason.append("MACD Bullish Crossover")
         if vol_breakout:
             reason.append("Volume Breakout")
         if bb_bounce:
             reason.append("Bouncing off Lower Bollinger Band")
-        if rsi < 30:
-            reason.append("Oversold (RSI < 30)")
-    elif ema20 < ema50 and rsi > 30 and macd < macd_signal:
+        if rsi < 40:
+            reason.append("Oversold (RSI < 40)")
+    elif (ema20 < ema50 or macd < macd_signal) and rsi > 30 and (rsi > 60 or ema20 < ema50):
         signal = "SELL"
-        reason.append("Downtrend (EMA20 < EMA50)")
-        reason.append("MACD Bearish Crossover")
+        if ema20 < ema50:
+            reason.append("Downtrend (EMA20 < EMA50)")
+        if macd < macd_signal:
+            reason.append("MACD Bearish Crossover")
         if rsi > 70:
             reason.append("Overbought (RSI > 70)")
             
@@ -149,7 +153,7 @@ def get_popular():
     popular_stocks = [
         "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK",
         "ITC", "SBIN", "BHARTIARTL", "BAJFINANCE", "LT",
-        "HUL", "ASIANPAINT", "MARUTI"
+        "HINDUNILVR", "ASIANPAINT", "MARUTI"
     ]
     results = []
     for stock in popular_stocks:
