@@ -61,7 +61,9 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:8000/api';
+        const API_BASE = window.location.port === '3000'
+            ? 'http://localhost:8000/api'
+            : `${window.location.origin}/api`;
 
         function getSignalClass(signal) {
             if (signal === 'BUY') return 'text-green-600 bg-green-100';

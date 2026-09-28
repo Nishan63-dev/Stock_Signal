@@ -1,12 +1,15 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import os
+from pathlib import Path
 import yfinance as yf
 import pandas as pd
 import pandas_ta_classic as ta
 import numpy as np
 
 app = FastAPI()
+FRONTEND_INDEX = Path(__file__).resolve().parent.parent / "frontend" / "index.html"
 
 app.add_middleware(
     CORSMiddleware,
@@ -87,6 +90,10 @@ def analyze_stock(ticker_symbol: str):
         },
         "last_updated": str(latest.name)
     }
+
+@app.get("/", include_in_schema=False)
+def serve_dashboard():
+    return FileResponse(FRONTEND_INDEX)
 
 @app.get("/api/analyze/{symbol}")
 def get_analysis(symbol: str):
