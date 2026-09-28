@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Indian Stock Signals</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -68,7 +69,19 @@
         </div>
 
         <!-- Popular Stocks Grid -->
-        <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4">Popular Stocks Dashboard</h2>
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+            <h2 class="text-2xl font-bold text-gray-800 dark:text-white">Popular Stocks Dashboard</h2>
+            <div class="flex items-center gap-2">
+                <label for="signal-filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Signal:</label>
+                <select id="signal-filter" class="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2">
+                    <option value="ALL">All Signals</option>
+                    <option value="BUY">Buy</option>
+                    <option value="SELL">Sell</option>
+                    <option value="NEUTRAL">Neutral</option>
+                </select>
+            </div>
+        </div>
+
         <div id="loading" class="text-center py-10">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-blue-600 dark:border-gray-600 dark:border-t-blue-500"></div>
             <p class="mt-2 text-gray-600 dark:text-gray-400">Loading real-time data...</p>
@@ -112,7 +125,7 @@
             });
         }
 
-        function createStockCard(data) {
+        function createStockCard(data, prefix = '') {
             const signalClass = getSignalClass(data.signal);
             const pureSymbol = data.ticker.replace('.NS', '');
             const inWatchlist = watchlist.includes(data.ticker);
@@ -146,7 +159,7 @@
             }
 
             return `
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                <div class="stock-card bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300" data-signal="${data.signal}">
                     <div class="p-5 border-b border-gray-100 dark:border-gray-700">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                             <h3 class="text-xl font-bold text-gray-800 dark:text-white">${pureSymbol}</h3>
@@ -159,6 +172,9 @@
                         </div>
                         <p class="text-3xl font-bold mt-2 dark:text-white">₹${data.current_price.toLocaleString('en-IN')}</p>
                         <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Last Updated: ${new Date(data.last_updated).toLocaleTimeString()}</p>
+                    </div>
+                    <div class="px-5 pt-3 pb-2 border-b border-gray-100 dark:border-gray-700 h-24">
+                        <canvas id="chart-${prefix}${pureSymbol}" class="w-full h-full"></canvas>
                     </div>
                     <div class="p-5 dark:text-gray-300">
                         ${reasonsHtml}
@@ -184,6 +200,73 @@
             `;
         }
 
+        function renderChart(canvasId, dates, prices) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+
+            // Destroy existing chart if it exists
+            const existingChart = Chart.getChart(canvasId);
+            if (existingChart) {
+                existingChart.destroy();
+            }
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const gridColor = isDark ? '#374151' : '#f3f4f6';
+            const textColor = isDark ? '#9ca3af' : '#6b7280';
+            const lineColor = '#4f46e5'; // Indigo
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates.map(d => {
+                        const date = new Date(d);
+                        return `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
+                    }),
+                    datasets: [{
+                        label: 'Price',
+                        data: prices,
+                        borderColor: lineColor,
+                        borderWidth: 2,
+                        tension: 0.1,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return `₹${context.parsed.y}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: false // Hide x axis for sparkline look
+                        },
+                        y: {
+                            display: false, // Hide y axis
+                            min: Math.min(...prices) * 0.999, // Tighten bounds
+                            max: Math.max(...prices) * 1.001
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
+        }
+
         async function fetchWatchlistStocks() {
             const grid = document.getElementById('watchlist-grid');
             const emptyMsg = document.getElementById('watchlist-empty');
@@ -202,7 +285,15 @@
                 const promises = watchlist.map(symbol => fetch(`${API_BASE}/analyze/${symbol}`).then(r => r.json()));
                 const results = await Promise.all(promises);
 
-                grid.innerHTML = results.map(stock => createStockCard(stock)).join('');
+                grid.innerHTML = results.map(stock => createStockCard(stock, 'wl-')).join('');
+
+                // Render charts after adding to DOM
+                results.forEach(stock => {
+                    const pureSymbol = stock.ticker.replace('.NS', '');
+                    if (stock.history && stock.history.dates && stock.history.prices) {
+                        renderChart(`chart-wl-${pureSymbol}`, stock.history.dates, stock.history.prices);
+                    }
+                });
             } catch (error) {
                 console.error('Error fetching watchlist:', error);
                 grid.innerHTML = '<p class="text-red-500">Failed to load watchlist.</p>';
@@ -220,14 +311,39 @@
                 const response = await fetch(`${API_BASE}/popular`);
                 const data = await response.json();
                 
-                grid.innerHTML = data.map(stock => createStockCard(stock)).join('');
+                grid.innerHTML = data.map(stock => createStockCard(stock, 'pop-')).join('');
+
+                // Render charts
+                data.forEach(stock => {
+                    const pureSymbol = stock.ticker.replace('.NS', '');
+                    if (stock.history && stock.history.dates && stock.history.prices) {
+                        renderChart(`chart-pop-${pureSymbol}`, stock.history.dates, stock.history.prices);
+                    }
+                });
                 
                 loading.classList.add('hidden');
                 grid.classList.remove('hidden');
+
+                // Apply current filter if any
+                applySignalFilter();
             } catch (error) {
                 console.error('Error fetching popular stocks:', error);
                 loading.innerHTML = '<p class="text-red-500">Failed to load data. Ensure backend is running.</p>';
             }
+        }
+
+        function applySignalFilter() {
+            const filterValue = document.getElementById('signal-filter').value;
+            const grid = document.getElementById('stocks-grid');
+            const cards = grid.querySelectorAll('.stock-card');
+
+            cards.forEach(card => {
+                if (filterValue === 'ALL' || card.getAttribute('data-signal') === filterValue) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
         }
 
         async function searchStock() {
@@ -251,7 +367,13 @@
                 }
                 const data = await response.json();
                 
-                resultDiv.innerHTML = createStockCard(data);
+                resultDiv.innerHTML = createStockCard(data, 'search-');
+
+                // Render chart
+                const pureSymbol = data.ticker.replace('.NS', '');
+                if (data.history && data.history.dates && data.history.prices) {
+                    renderChart(`chart-search-${pureSymbol}`, data.history.dates, data.history.prices);
+                }
                 
                 loadingDiv.classList.add('hidden');
                 resultDiv.classList.remove('hidden');
@@ -273,6 +395,7 @@
         document.getElementById('symbol-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') searchStock();
         });
+        document.getElementById('signal-filter').addEventListener('change', applySignalFilter);
 
         // Theme Toggle Logic
         const themeToggleBtn = document.getElementById('theme-toggle');
