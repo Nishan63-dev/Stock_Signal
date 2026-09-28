@@ -33,6 +33,8 @@ def analyze_stock(ticker_symbol: str):
     df.ta.rsi(append=True)
     df.ta.ema(length=20, append=True)
     df.ta.ema(length=50, append=True)
+    df.ta.bbands(length=20, append=True)
+    df['Volume_SMA20'] = df['Volume'].rolling(window=20).mean()
     
     # Get latest row
     latest = df.iloc[-1]
@@ -45,15 +47,26 @@ def analyze_stock(ticker_symbol: str):
     ema20 = float(latest['EMA_20'])
     ema50 = float(latest['EMA_50'])
     atr = float(latest['ATRr_14'])
+    vol = float(latest['Volume'])
+    vol_sma20 = float(latest['Volume_SMA20'])
+    low_price = float(latest['Low'])
+    bbl_20 = float(latest['BBL_20_2.0'])
     
     signal = "NEUTRAL"
     reason = []
     
+    vol_breakout = vol > vol_sma20
+    bb_bounce = low_price <= bbl_20
+
     # Simple strategy logic
-    if ema20 > ema50 and rsi < 70 and macd > macd_signal:
+    if ema20 > ema50 and rsi < 70 and macd > macd_signal and (vol_breakout or bb_bounce):
         signal = "BUY"
         reason.append("Uptrend (EMA20 > EMA50)")
         reason.append("MACD Bullish Crossover")
+        if vol_breakout:
+            reason.append("Volume Breakout")
+        if bb_bounce:
+            reason.append("Bouncing off Lower Bollinger Band")
         if rsi < 30:
             reason.append("Oversold (RSI < 30)")
     elif ema20 < ema50 and rsi > 30 and macd < macd_signal:

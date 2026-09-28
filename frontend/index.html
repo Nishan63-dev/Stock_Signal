@@ -5,33 +5,52 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Indian Stock Signals</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
     <style>
         .buy-signal { color: #16a34a; }
         .sell-signal { color: #dc2626; }
         .neutral-signal { color: #6b7280; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen font-sans">
+<body class="bg-gray-100 min-h-screen font-sans dark:bg-gray-900 transition-colors duration-200">
     <div class="container mx-auto px-4 py-8 max-w-5xl">
         <header class="mb-8 flex justify-between items-center">
             <div>
-                <h1 class="text-3xl font-bold text-gray-800">Indian Stock Signals</h1>
-                <p class="text-gray-600 mt-2">Real-time trading signals, targets, and stop-loss for NSE stocks</p>
+                <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Indian Stock Signals</h1>
+                <p class="text-gray-600 dark:text-gray-400 mt-2">Real-time trading signals, targets, and stop-loss for NSE stocks</p>
+                <div id="countdown-timer" class="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-2">Refreshing in 03:00</div>
             </div>
-            <div>
+            <div class="flex items-center gap-4">
+                <button id="theme-toggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500">
+                    <span id="theme-toggle-light-icon" class="hidden">☀️</span>
+                    <span id="theme-toggle-dark-icon" class="hidden">🌙</span>
+                </button>
                 <button id="refresh-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow">
                     Refresh Data
                 </button>
             </div>
         </header>
 
+        <!-- Watchlist Section -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4">My Watchlist</h2>
+            <div id="watchlist-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Watchlist cards will be populated here -->
+                <p id="watchlist-empty" class="text-gray-500 dark:text-gray-400 italic col-span-full">Your watchlist is empty. Search for a stock to add it.</p>
+            </div>
+        </div>
+
         <!-- Search Bar -->
-        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h2 class="text-xl font-semibold mb-4">Analyze Any NSE Stock</h2>
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-xl font-semibold mb-4 dark:text-white">Analyze Any NSE Stock</h2>
             <div class="flex gap-4">
                 <div class="relative flex-1">
                     <input type="text" id="symbol-input" placeholder="Enter Symbol (e.g., RELIANCE, TCS, INFY)" 
-                           class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase">
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase dark:bg-gray-700 dark:text-white">
                 </div>
                 <button id="search-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-md shadow">
                     Analyze
@@ -40,19 +59,19 @@
             <div id="search-result" class="mt-6 hidden">
                 <!-- Result will be populated here -->
             </div>
-            <div id="search-error" class="mt-4 text-red-600 hidden">
+            <div id="search-error" class="mt-4 text-red-600 dark:text-red-400 hidden">
                 <!-- Error will be shown here -->
             </div>
-            <div id="search-loading" class="mt-4 text-gray-600 hidden">
+            <div id="search-loading" class="mt-4 text-gray-600 dark:text-gray-400 hidden">
                 Loading analysis...
             </div>
         </div>
 
         <!-- Popular Stocks Grid -->
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Popular Stocks Dashboard</h2>
+        <h2 class="text-2xl font-bold text-gray-800 dark:text-white mb-4">Popular Stocks Dashboard</h2>
         <div id="loading" class="text-center py-10">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-blue-600"></div>
-            <p class="mt-2 text-gray-600">Loading real-time data...</p>
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-gray-300 border-t-blue-600 dark:border-gray-600 dark:border-t-blue-500"></div>
+            <p class="mt-2 text-gray-600 dark:text-gray-400">Loading real-time data...</p>
         </div>
         
         <div id="stocks-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 hidden">
@@ -71,8 +90,32 @@
             return 'text-gray-600 bg-gray-100';
         }
 
+        // Watchlist state
+        let watchlist = JSON.parse(localStorage.getItem('watchlist')) || [];
+
+        function toggleWatchlist(symbol) {
+            if (watchlist.includes(symbol)) {
+                watchlist = watchlist.filter(s => s !== symbol);
+            } else {
+                watchlist.push(symbol);
+            }
+            localStorage.setItem('watchlist', JSON.stringify(watchlist));
+
+            // Re-render watchlist grid
+            fetchWatchlistStocks();
+
+            // Update buttons directly in the DOM to avoid unnecessary re-fetching
+            document.querySelectorAll(`button[onclick="toggleWatchlist('${symbol}')"]`).forEach(btn => {
+                const inWatchlist = watchlist.includes(symbol);
+                btn.className = `text-sm font-semibold py-1 px-2 rounded border ${inWatchlist ? 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900 dark:text-indigo-200 dark:border-indigo-700' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600'}`;
+                btn.textContent = inWatchlist ? '★ Saved' : '+ Watchlist';
+            });
+        }
+
         function createStockCard(data) {
             const signalClass = getSignalClass(data.signal);
+            const pureSymbol = data.ticker.replace('.NS', '');
+            const inWatchlist = watchlist.includes(data.ticker);
             
             let reasonsHtml = '';
             if (data.reasons && data.reasons.length > 0) {
@@ -103,30 +146,35 @@
             }
 
             return `
-                <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
-                    <div class="p-5 border-b border-gray-100">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
+                    <div class="p-5 border-b border-gray-100 dark:border-gray-700">
                         <div class="flex justify-between items-start">
-                            <h3 class="text-xl font-bold text-gray-800">${data.ticker.replace('.NS', '')}</h3>
-                            <span class="px-3 py-1 rounded-full text-xs font-bold ${signalClass}">${data.signal}</span>
+                            <h3 class="text-xl font-bold text-gray-800 dark:text-white">${pureSymbol}</h3>
+                            <div class="flex gap-2 items-center">
+                                <span class="px-3 py-1 rounded-full text-xs font-bold ${signalClass}">${data.signal}</span>
+                                <button onclick="toggleWatchlist('${data.ticker}')" class="text-sm font-semibold py-1 px-2 rounded border ${inWatchlist ? 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900 dark:text-indigo-200 dark:border-indigo-700' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600'}">
+                                    ${inWatchlist ? '★ Saved' : '+ Watchlist'}
+                                </button>
+                            </div>
                         </div>
-                        <p class="text-3xl font-bold mt-2">₹${data.current_price.toLocaleString('en-IN')}</p>
-                        <p class="text-xs text-gray-400 mt-1">Last Updated: ${new Date(data.last_updated).toLocaleTimeString()}</p>
+                        <p class="text-3xl font-bold mt-2 dark:text-white">₹${data.current_price.toLocaleString('en-IN')}</p>
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Last Updated: ${new Date(data.last_updated).toLocaleTimeString()}</p>
                     </div>
-                    <div class="p-5">
+                    <div class="p-5 dark:text-gray-300">
                         ${reasonsHtml}
                         
                         <div class="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-                            <div class="bg-gray-50 p-2 rounded">
-                                <span class="block text-gray-500">RSI</span>
-                                <span class="font-semibold">${data.indicators.rsi}</span>
+                            <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                                <span class="block text-gray-500 dark:text-gray-400">RSI</span>
+                                <span class="font-semibold dark:text-white">${data.indicators.rsi}</span>
                             </div>
-                            <div class="bg-gray-50 p-2 rounded">
-                                <span class="block text-gray-500">MACD</span>
-                                <span class="font-semibold">${data.indicators.macd}</span>
+                            <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                                <span class="block text-gray-500 dark:text-gray-400">MACD</span>
+                                <span class="font-semibold dark:text-white">${data.indicators.macd}</span>
                             </div>
-                            <div class="bg-gray-50 p-2 rounded">
-                                <span class="block text-gray-500">EMA20</span>
-                                <span class="font-semibold">${data.indicators.ema20}</span>
+                            <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                                <span class="block text-gray-500 dark:text-gray-400">EMA20</span>
+                                <span class="font-semibold dark:text-white">${data.indicators.ema20}</span>
                             </div>
                         </div>
                         
@@ -134,6 +182,31 @@
                     </div>
                 </div>
             `;
+        }
+
+        async function fetchWatchlistStocks() {
+            const grid = document.getElementById('watchlist-grid');
+            const emptyMsg = document.getElementById('watchlist-empty');
+
+            if (watchlist.length === 0) {
+                grid.innerHTML = '';
+                grid.appendChild(emptyMsg);
+                emptyMsg.classList.remove('hidden');
+                return;
+            }
+
+            emptyMsg.classList.add('hidden');
+            grid.innerHTML = '<p class="text-gray-500 dark:text-gray-400 italic">Loading watchlist...</p>';
+
+            try {
+                const promises = watchlist.map(symbol => fetch(`${API_BASE}/analyze/${symbol}`).then(r => r.json()));
+                const results = await Promise.all(promises);
+
+                grid.innerHTML = results.map(stock => createStockCard(stock)).join('');
+            } catch (error) {
+                console.error('Error fetching watchlist:', error);
+                grid.innerHTML = '<p class="text-red-500">Failed to load watchlist.</p>';
+            }
         }
 
         async function fetchPopularStocks() {
@@ -191,14 +264,83 @@
         }
 
         // Event Listeners
-        document.getElementById('refresh-btn').addEventListener('click', fetchPopularStocks);
+        document.getElementById('refresh-btn').addEventListener('click', () => {
+            fetchPopularStocks();
+            fetchWatchlistStocks();
+            resetTimer();
+        });
         document.getElementById('search-btn').addEventListener('click', searchStock);
         document.getElementById('symbol-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') searchStock();
         });
 
+        // Theme Toggle Logic
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const darkIcon = document.getElementById('theme-toggle-dark-icon');
+        const lightIcon = document.getElementById('theme-toggle-light-icon');
+
+        function updateThemeIcons() {
+            if (document.documentElement.classList.contains('dark')) {
+                lightIcon.classList.remove('hidden');
+                darkIcon.classList.add('hidden');
+            } else {
+                lightIcon.classList.add('hidden');
+                darkIcon.classList.remove('hidden');
+            }
+        }
+
+        // Initialize Theme
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        updateThemeIcons();
+
+        themeToggleBtn.addEventListener('click', function() {
+            document.documentElement.classList.toggle('dark');
+            if (document.documentElement.classList.contains('dark')) {
+                localStorage.theme = 'dark';
+            } else {
+                localStorage.theme = 'light';
+            }
+            updateThemeIcons();
+        });
+
+        // Auto-refresh Timer Logic
+        let timeLeft = 180; // 3 minutes
+        const timerDisplay = document.getElementById('countdown-timer');
+        let timerInterval;
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent = `Refreshing in ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function resetTimer() {
+            timeLeft = 180;
+            updateTimerDisplay();
+        }
+
+        function startTimer() {
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                if (timeLeft < 0) {
+                    fetchPopularStocks();
+                    fetchWatchlistStocks();
+                    resetTimer();
+                } else {
+                    updateTimerDisplay();
+                }
+            }, 1000);
+        }
+
         // Initial load
         fetchPopularStocks();
+        fetchWatchlistStocks();
+        startTimer();
     </script>
 </body>
 </html>
