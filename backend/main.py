@@ -21,8 +21,8 @@ app.add_middleware(
 
 def analyze_stock(ticker_symbol: str):
     ticker = yf.Ticker(ticker_symbol)
-    # Get 1 month of 5-minute data to have enough history for indicators
-    df = ticker.history(period="1mo", interval="15m")
+    # Get 7 days of 1-minute data to have live data and enough history for indicators
+    df = ticker.history(period="7d", interval="1m")
     
     if df.empty:
         raise HTTPException(status_code=404, detail=f"No data found for {ticker_symbol}")
